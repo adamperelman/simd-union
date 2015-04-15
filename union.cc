@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <iostream>
 #include <limits>
+#include <omp.h>
 #include <random>
 #include <set>
 #include <stdexcept>
@@ -21,7 +23,7 @@ const int NUM_SETS = 3;
 #ifdef MEDIUM
 const int MAX_ELEM = 250000;
 const int MAX_SET_SIZE = 500;
-const int NUM_SETS = 500;
+const int NUM_SETS = 1024;
 #endif
 
 const char* ALGORITHMS[] = {"stl", "multiway", "min"};
@@ -29,18 +31,41 @@ const char* ALGORITHMS[] = {"stl", "multiway", "min"};
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
 
-vector<int> stl_set_union(vector<int> sets[]) {
-   vector<int> result(sets[0]);
-   vector<int> tmp;
+inline vector<int> merge_sets_stl(const vector<int>& a,
+                                  const vector<int>& b) {
+  vector<int> result;
+  result.reserve(a.size() + b.size());
+  set_union(a.begin(), a.end(),
+            b.begin(), b.end(),
+            back_inserter(result));
 
-   for (int i = 1; i < NUM_SETS; ++i) {
-     set_union(result.begin(), result.end(),
-               sets[i].begin(), sets[i].end(),
-               back_inserter(tmp));
-     result = tmp;
-     tmp.clear();
-   }
-   return result;
+  return result;
+}
+
+vector<int> stl_set_union(vector<int> sets[], int start, int end) {
+  if (start == end) return vector<int>();
+  if (start == end - 1) return sets[start];
+
+  int midpoint = start + (end - start) / 2;
+  vector<int> a = stl_set_union(sets, start, midpoint);
+  vector<int> b = stl_set_union(sets, midpoint, end);
+
+  return merge_sets_stl(a, b);
+}
+
+vector<int> stl_set_union(vector<int> sets[]) {
+  const int NUM_CHUNKS = 8;
+  vector<int> partial_results[NUM_CHUNKS];
+  int step = NUM_SETS / NUM_CHUNKS;
+  assert(step * NUM_CHUNKS == NUM_SETS);
+
+  #pragma omp parallel
+  #pragma omp for
+  for (int i = 0; i < NUM_CHUNKS; ++i) {
+    partial_results[i] = stl_set_union(sets, step*i, step*(i+1));
+  }
+
+  return stl_set_union(partial_results, 0, NUM_CHUNKS);
 }
 
 vector<int> min_union(vector<int> sets[]) {
@@ -143,6 +168,7 @@ int main(int argc, char* argv[]) {
   #endif
 
   vector<int> reference;
+
   for (const char* alg : ALGORITHMS) {
     cout << "using algorithm " << alg << "..." << endl;
 
