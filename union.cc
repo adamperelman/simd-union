@@ -7,9 +7,10 @@
 
 using namespace std;
 
-const int MAX_INT = 500000;
-const int MAX_SET_SIZE = 5000;
-const int NUM_SETS = 100;
+const int MIN_ELEM = 1;
+const int MAX_ELEM = 250000;
+const int MAX_SET_SIZE = 500;
+const int NUM_SETS = 500;
 
 const char* ALGORITHMS[] = {"stl", "multiway"};
 
@@ -37,6 +38,17 @@ vector<int> multiway_set_union(vector<int> sets[]) {
   }
 
   vector<int> result;
+  for (int val = MIN_ELEM; val <= MAX_ELEM; ++val) {
+    for (int i = 0; i < NUM_SETS; ++i) {
+      while (*its[i] < val) its[i]++;
+
+      if (*its[i] == val) {
+        result.push_back(val);
+        break;
+      }
+    }
+  }
+
   return result;
 }
 
@@ -60,7 +72,7 @@ void print_set(vector<int> set) {
 void populate_sets(vector<int> sets[]) {
   random_device rd;
   mt19937 gen(rd());
-  uniform_int_distribution<> distribution(1, MAX_INT);
+  uniform_int_distribution<> distribution(MIN_ELEM, MAX_ELEM);
 
   for (int set_i = 0; set_i < NUM_SETS; ++set_i) {
     set<int> tmp;
@@ -89,6 +101,7 @@ int main(int argc, char* argv[]) {
 
     if (reference.empty()) {
       reference = output;
+      cout << "output size: " << reference.size() << endl;
     } else {
       if (reference == output) {
         cout << "output is correct" << endl;
