@@ -12,7 +12,7 @@
 
 using namespace std;
 
-#define MEDIUM
+#define BIG
 
 const int MIN_ELEM = 1;
 
@@ -28,9 +28,14 @@ const int MAX_SET_SIZE = 1 << 11;
 const int NUM_SETS = 1 << 11;
 #endif
 
+#ifdef BIG
+const int MAX_ELEM = 1 << 26;
+const int MAX_SET_SIZE = 1 << 13;
+const int NUM_SETS = 1 << 13;
+#endif
+
 const char* ALGORITHMS[] = {"stl",
-                            "stl_parallel",
-                            "intermediate_set"};
+                            "stl_parallel"};
 
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
@@ -192,11 +197,12 @@ void print_set(vector<int> set) {
 }
 
 void populate_sets(vector<int> sets[]) {
-  random_device rd;
-  mt19937 gen(rd());
-  uniform_int_distribution<> distribution(MIN_ELEM, MAX_ELEM);
-
+  #pragma omp parallel for
   for (int set_i = 0; set_i < NUM_SETS; ++set_i) {
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<> distribution(MIN_ELEM, MAX_ELEM);
+
     set<int> tmp;
     for (int elem_i = 0; elem_i < MAX_SET_SIZE; ++elem_i) {
       tmp.insert(distribution(gen));
@@ -207,8 +213,13 @@ void populate_sets(vector<int> sets[]) {
 
 int main(int argc, char* argv[]) {
   vector<int> sets[NUM_SETS];
+
   cout << "building sets..." << endl;
+  Clock::time_point build_start = Clock::now();
   populate_sets(sets);
+  Clock::time_point build_end = Clock::now();
+  print_time("building", build_start, build_end);
+  cout << endl;
 
   #ifdef SMALL
   cout << "input:" << endl;
