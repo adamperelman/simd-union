@@ -22,11 +22,11 @@ const int NUM_SETS = 3;
 
 #ifdef MEDIUM
 const int MAX_ELEM = 250000;
-const int MAX_SET_SIZE = 500;
-const int NUM_SETS = 1024;
+const int MAX_SET_SIZE = 512;
+const int NUM_SETS = 2048;
 #endif
 
-const char* ALGORITHMS[] = {"stl", "multiway", "min"};
+const char* ALGORITHMS[] = {"stl", "stl_parallel", "multiway"};
 
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
@@ -41,7 +41,6 @@ inline vector<int> merge_sets_stl(const vector<int>& a,
 
   return result;
 }
-
 vector<int> stl_set_union(vector<int> sets[], int start, int end) {
   if (start == end) return vector<int>();
   if (start == end - 1) return sets[start];
@@ -54,13 +53,16 @@ vector<int> stl_set_union(vector<int> sets[], int start, int end) {
 }
 
 vector<int> stl_set_union(vector<int> sets[]) {
+  return stl_set_union(sets, 0, NUM_SETS);
+}
+
+vector<int> stl_set_union_parallel(vector<int> sets[]) {
   const int NUM_CHUNKS = 8;
   vector<int> partial_results[NUM_CHUNKS];
   int step = NUM_SETS / NUM_CHUNKS;
   assert(step * NUM_CHUNKS == NUM_SETS);
 
-  #pragma omp parallel
-  #pragma omp for
+  #pragma omp parallel for
   for (int i = 0; i < NUM_CHUNKS; ++i) {
     partial_results[i] = stl_set_union(sets, step*i, step*(i+1));
   }
@@ -124,6 +126,8 @@ vector<int> multiway_set_union(vector<int> sets[]) {
 vector<int> set_union(vector<int> sets[], string algorithm) {
   if (algorithm == "stl") {
     return stl_set_union(sets);
+  } else if (algorithm == "stl_parallel") {
+    return stl_set_union_parallel(sets);
   } else if (algorithm == "multiway") {
     return multiway_set_union(sets);
   } else if (algorithm == "min") {
