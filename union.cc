@@ -4,9 +4,11 @@
 #include <iostream>
 #include <limits>
 #include <omp.h>
+#include <parallel/algorithm>
 #include <random>
 #include <set>
 #include <stdexcept>
+#include <unordered_set>
 
 using namespace std;
 
@@ -26,7 +28,9 @@ const int MAX_SET_SIZE = 1 << 11;
 const int NUM_SETS = 1 << 11;
 #endif
 
-const char* ALGORITHMS[] = {"stl", "stl_parallel"};
+const char* ALGORITHMS[] = {"stl",
+                            "stl_parallel",
+                            "intermediate_set"};
 
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
@@ -34,6 +38,13 @@ typedef chrono::milliseconds ms;
 inline size_t elapsed_time(Clock::time_point start,
                            Clock::time_point end) {
   return chrono::duration_cast<ms>(end - start).count();
+}
+
+inline void print_time(const char* message,
+                       Clock::time_point start,
+                       Clock::time_point end) {
+  cout << message << " time: "
+       << elapsed_time(start, end) << "ms" << endl;
 }
 inline vector<int> merge_sets_stl(const vector<int>& a,
                                   const vector<int>& b) {
@@ -75,9 +86,7 @@ vector<int> stl_set_union_parallel(vector<int> sets[]) {
 
   Clock::time_point parallel_end = Clock::now();
 
-  cout << "time in parallel region: "
-       << elapsed_time(parallel_start, parallel_end)
-       << "ms" << endl;
+  print_time("parallel", parallel_start, parallel_end);
 
   return stl_set_union(partial_results, 0, NUM_CHUNKS);
 }
@@ -114,6 +123,30 @@ vector<int> min_union(vector<int> sets[]) {
   return result;
 }
 
+vector<int> intermediate_set_union(vector<int> sets[]) {
+  Clock::time_point insert_start = Clock::now();
+  unordered_set<int> s;
+  for (int i = 0; i < NUM_SETS; ++i) {
+    s.insert(sets[i].begin(), sets[i].end());
+  }
+
+  Clock::time_point insert_end = Clock::now();
+
+  print_time("inserting", insert_start, insert_end);
+
+  vector<int> result;
+  result.reserve(s.size());
+  result.insert(result.end(), s.begin(), s.end());
+
+  Clock::time_point sort_start = Clock::now();
+  __gnu_parallel::sort(result.begin(), result.end());
+  Clock::time_point sort_end = Clock::now();
+
+  print_time("sorting", sort_start, sort_end);
+
+  return result;
+}
+
 vector<int> multiway_set_union(vector<int> sets[]) {
   vector<int>::iterator its[NUM_SETS];
   for (int i = 0; i < NUM_SETS; ++i) {
@@ -140,6 +173,8 @@ vector<int> set_union(vector<int> sets[], string algorithm) {
     return stl_set_union(sets);
   } else if (algorithm == "stl_parallel") {
     return stl_set_union_parallel(sets);
+  } else if (algorithm == "intermediate_set") {
+    return intermediate_set_union(sets);
   } else if (algorithm == "multiway") {
     return multiway_set_union(sets);
   } else if (algorithm == "min") {
@@ -186,14 +221,14 @@ int main(int argc, char* argv[]) {
   vector<int> reference;
 
   for (const char* alg : ALGORITHMS) {
-    cout << "using algorithm " << alg << "..." << endl;
+    cout << "**** " << alg << " ****" << endl;
 
     Clock::time_point start = Clock::now();
     vector<int> output = set_union(sets, string(alg));
     Clock::time_point end = Clock::now();
 
-    cout << "total time: "
-         << elapsed_time(start, end) << "ms" << endl;
+    cout << endl;
+    print_time("total", start, end);
 
     if (reference.empty()) {
       reference = output;
