@@ -1,18 +1,30 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <set>
 #include <stdexcept>
 
 using namespace std;
 
+#define MEDIUM
+
 const int MIN_ELEM = 1;
+
+#ifdef SMALL
+const int MAX_ELEM = 10;
+const int MAX_SET_SIZE = 3;
+const int NUM_SETS = 3;
+#endif
+
+#ifdef MEDIUM
 const int MAX_ELEM = 250000;
 const int MAX_SET_SIZE = 500;
 const int NUM_SETS = 500;
+#endif
 
-const char* ALGORITHMS[] = {"stl", "multiway"};
+const char* ALGORITHMS[] = {"stl", "multiway", "min"};
 
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
@@ -29,6 +41,38 @@ vector<int> stl_set_union(vector<int> sets[]) {
      tmp.clear();
    }
    return result;
+}
+
+vector<int> min_union(vector<int> sets[]) {
+  vector<int>::iterator its[NUM_SETS];
+  for (int i = 0; i < NUM_SETS; ++i) {
+    its[i] = sets[i].begin();
+  }
+
+  vector<int> result;
+  bool more_values = true;
+  while (more_values) {
+    int min = numeric_limits<int>::max();
+    for (int i = 0; i < NUM_SETS; ++i) {
+      if (its[i] < sets[i].end() && *its[i] < min) {
+        min = *its[i];
+      }
+    }
+
+    result.push_back(min);
+
+    more_values = false;
+    for (int i = 0; i < NUM_SETS; ++i) {
+      while (its[i] < sets[i].end() && *its[i] <= min) {
+        ++its[i];
+      }
+      if (its[i] < sets[i].end()) {
+        more_values = true;
+      }
+    }
+  }
+
+  return result;
 }
 
 vector<int> multiway_set_union(vector<int> sets[]) {
@@ -57,6 +101,8 @@ vector<int> set_union(vector<int> sets[], string algorithm) {
     return stl_set_union(sets);
   } else if (algorithm == "multiway") {
     return multiway_set_union(sets);
+  } else if (algorithm == "min") {
+    return min_union(sets);
   } else {
     throw runtime_error("unknown algorithm");
   }
@@ -88,6 +134,14 @@ int main(int argc, char* argv[]) {
   cout << "building sets..." << endl;
   populate_sets(sets);
 
+  #ifdef SMALL
+  cout << "input:" << endl;
+  for (int i = 0; i < NUM_SETS; ++i) {
+    print_set(sets[i]);
+  }
+  cout << endl;
+  #endif
+
   vector<int> reference;
   for (const char* alg : ALGORITHMS) {
     cout << "using algorithm " << alg << "..." << endl;
@@ -107,6 +161,12 @@ int main(int argc, char* argv[]) {
         cout << "output is correct" << endl;
       } else {
         cout << "OUTPUT DOES NOT MATCH" << endl;
+        #ifdef SMALL
+        cout << "reference:" << endl;
+        print_set(reference);
+        cout << "actual:" << endl;
+        print_set(output);
+        #endif
       }
     }
 
