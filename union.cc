@@ -21,16 +21,20 @@ const int NUM_SETS = 3;
 #endif
 
 #ifdef MEDIUM
-const int MAX_ELEM = 250000;
-const int MAX_SET_SIZE = 512;
-const int NUM_SETS = 2048;
+const int MAX_ELEM = 1 << 22;
+const int MAX_SET_SIZE = 1 << 11;
+const int NUM_SETS = 1 << 11;
 #endif
 
-const char* ALGORITHMS[] = {"stl", "stl_parallel", "multiway"};
+const char* ALGORITHMS[] = {"stl", "stl_parallel"};
 
 typedef chrono::high_resolution_clock Clock;
 typedef chrono::milliseconds ms;
 
+inline size_t elapsed_time(Clock::time_point start,
+                           Clock::time_point end) {
+  return chrono::duration_cast<ms>(end - start).count();
+}
 inline vector<int> merge_sets_stl(const vector<int>& a,
                                   const vector<int>& b) {
   vector<int> result;
@@ -57,15 +61,23 @@ vector<int> stl_set_union(vector<int> sets[]) {
 }
 
 vector<int> stl_set_union_parallel(vector<int> sets[]) {
-  const int NUM_CHUNKS = 8;
+  const int NUM_CHUNKS = 1 << 3;
   vector<int> partial_results[NUM_CHUNKS];
   int step = NUM_SETS / NUM_CHUNKS;
   assert(step * NUM_CHUNKS == NUM_SETS);
+
+  Clock::time_point parallel_start = Clock::now();
 
   #pragma omp parallel for
   for (int i = 0; i < NUM_CHUNKS; ++i) {
     partial_results[i] = stl_set_union(sets, step*i, step*(i+1));
   }
+
+  Clock::time_point parallel_end = Clock::now();
+
+  cout << "time in parallel region: "
+       << elapsed_time(parallel_start, parallel_end)
+       << "ms" << endl;
 
   return stl_set_union(partial_results, 0, NUM_CHUNKS);
 }
@@ -180,8 +192,8 @@ int main(int argc, char* argv[]) {
     vector<int> output = set_union(sets, string(alg));
     Clock::time_point end = Clock::now();
 
-    ms time = chrono::duration_cast<ms>(end - start);
-    cout << "time: " << time.count() << "ms" << endl;
+    cout << "total time: "
+         << elapsed_time(start, end) << "ms" << endl;
 
     if (reference.empty()) {
       reference = output;
