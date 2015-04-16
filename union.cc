@@ -77,7 +77,7 @@ vector<int> stl_set_union(vector<int> sets[]) {
 }
 
 vector<int> stl_set_union_parallel(vector<int> sets[]) {
-  const int NUM_CHUNKS = 1 << 3;
+  const int NUM_CHUNKS = 1 << 4;
   vector<int> partial_results[NUM_CHUNKS];
   int step = NUM_SETS / NUM_CHUNKS;
   assert(step * NUM_CHUNKS == NUM_SETS);
@@ -93,7 +93,24 @@ vector<int> stl_set_union_parallel(vector<int> sets[]) {
 
   print_time("parallel", parallel_start, parallel_end);
 
-  return stl_set_union(partial_results, 0, NUM_CHUNKS);
+  const int NUM_REDUCERS = 2;
+  vector<int> reduced[NUM_REDUCERS];
+  step = NUM_CHUNKS / NUM_REDUCERS;
+  assert(step * NUM_REDUCERS == NUM_CHUNKS);
+
+  Clock::time_point reducer_start = Clock::now();
+
+  #pragma omp parallel for
+  for (int i = 0; i < NUM_REDUCERS; ++i) {
+    reduced[i] = stl_set_union(partial_results,
+                               step*i,
+                               step*(i+1));
+  }
+
+  Clock::time_point reducer_end = Clock::now();
+  print_time("reducer", reducer_start, reducer_end);
+
+  return merge_sets_stl(reduced[0], reduced[1]);
 }
 
 vector<int> min_union(vector<int> sets[]) {
